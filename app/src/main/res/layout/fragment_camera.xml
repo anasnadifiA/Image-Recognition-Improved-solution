@@ -13,19 +13,18 @@
 
     <androidx.camera.view.PreviewView
         android:id="@+id/view_finder"
+        android:layout_height="0dp"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/container"
         app:scaleType="fillStart"/>
 
     <com.upfeat.test.OverlayView
         android:id="@+id/overlay"
-        android:layout_height="match_parent"
-        android:layout_width="match_parent" />
-
-    <include
-        android:id="@+id/bottom_sheet_layout"
-        layout="@layout/info_bottom_sheet"
-        android:visibility="gone"/>
+        android:layout_height="0dp"
+        android:layout_width="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/container"/>
     
     <LinearLayout
         android:layout_width="match_parent"

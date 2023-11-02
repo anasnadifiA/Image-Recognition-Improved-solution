@@ -1,8 +1,9 @@
-package com.upfeat.test.fragments
+package com.upfeat.test
 
 import android.annotation.SuppressLint
 import android.content.res.Configuration
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -12,16 +13,14 @@ import android.view.animation.AlphaAnimation
 import android.view.animation.Animation
 import android.widget.*
 import androidx.camera.core.*
+import androidx.camera.core.CameraSelector.LENS_FACING_BACK
 import androidx.camera.core.ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import androidx.navigation.Navigation
-import com.upfeat.test.ObjectDetectorHelper
-import com.upfeat.test.R
+import com.upfeat.test.*
 import com.upfeat.test.databinding.FragmentCameraBinding
-import com.upfeat.test.getScreenShot
-import com.upfeat.test.store
+import kotlinx.coroutines.*
 import org.tensorflow.lite.task.vision.detector.Detection
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -57,15 +56,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
 
 
 
-    override fun onResume() {
-        super.onResume()
-        // Make sure that all permissions are still present, since the
-        // user could have removed them while the app was in paused state.
-        if (!PermissionsFragment.hasPermissions(requireContext())) {
-            Navigation.findNavController(requireActivity(), R.id.fragment_container)
-                .navigate(CameraFragmentDirections.actionCameraToPermissions())
-        }
-    }
+
 
     override fun onDestroyView() {
         _fragmentCameraBinding = null
@@ -93,6 +84,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+
         objectDetectorHelper = ObjectDetectorHelper(
             context = requireContext(),
             objectDetectorListener = this)
@@ -105,9 +97,6 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
             // Set up the camera and its use cases
             setUpCamera()
         }
-
-        // Attach listeners to UI control widgets
-        initBottomSheetControls()
 
         seekBar.apply {
             tvValue.text = String.format("%d", 50 as Integer) + "%"
@@ -151,7 +140,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
 
         // Fade animation is used to show the user that a snapshot was taken.
         val fade = AlphaAnimation(1f, 0f)
-        fade.duration = 50;
+        fade.duration = 500;
         fade.setAnimationListener(object : Animation.AnimationListener {
             override fun onAnimationStart(p0: Animation?) {
             }
@@ -167,113 +156,26 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         btnSnapShot.setOnClickListener {
             // on click a snap shot is taken, and saved at /Pictures/UpfeatTest/...
             with(_fragmentCameraBinding!!){
-                val rootView: View = requireActivity().window.decorView
-                    .findViewById(android.R.id.content)
-                store(getScreenShot(rootView), "snapShot_"+System.currentTimeMillis().toString().replace(":", ".").substring(6) + ".jpg")
-                pnlFlash.visibility = View.VISIBLE;
-                pnlFlash.startAnimation(fade);
-            }
-        }
-    }
-
-    private fun initBottomSheetControls() {
-        // When clicked, lower detection score threshold floor
-        fragmentCameraBinding.bottomSheetLayout.thresholdMinus.setOnClickListener {
-            if (objectDetectorHelper.threshold.value!! >= 0.1) {
-                objectDetectorHelper.threshold.apply {
-                    val newValue = this.value!! - 0.1f
-                    postValue( newValue )
-                }
-                updateControlsUi()
+                pnlFlash.visibility = View.VISIBLE
+                overlay.background = BitmapDrawable(
+                    resources,
+                    bitmapBuffer.rotate(
+                        //depending on camera rotation, rotate the retrieved bitmap
+                        if(currentCamDirection == LENS_FACING_BACK){
+                            90f
+                        }else{
+                            -90f
+                        }
+                    )
+                )
+                store(getScreenShot(overlay), "snapShot_"+System.currentTimeMillis().toString().replace(":", ".").substring(6) + ".jpg")
+                pnlFlash.startAnimation(fade)
+                overlay.background = null
             }
         }
 
-        // When clicked, raise detection score threshold floor
-        fragmentCameraBinding.bottomSheetLayout.thresholdPlus.setOnClickListener {
-            if (objectDetectorHelper.threshold.value!! <= 0.8) {
-                objectDetectorHelper.threshold.apply {
-                    val newValue = this.value!! + 0.1f
-                    postValue(newValue)
-                }
-                updateControlsUi()
-            }
-        }
+        isStoragePermissionGranted()
 
-        // When clicked, reduce the number of objects that can be detected at a time
-        fragmentCameraBinding.bottomSheetLayout.maxResultsMinus.setOnClickListener {
-            if (objectDetectorHelper.maxResults > 1) {
-                objectDetectorHelper.maxResults--
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, increase the number of objects that can be detected at a time
-        fragmentCameraBinding.bottomSheetLayout.maxResultsPlus.setOnClickListener {
-            if (objectDetectorHelper.maxResults < 5) {
-                objectDetectorHelper.maxResults++
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, decrease the number of threads used for detection
-        fragmentCameraBinding.bottomSheetLayout.threadsMinus.setOnClickListener {
-            if (objectDetectorHelper.numThreads > 1) {
-                objectDetectorHelper.numThreads--
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, increase the number of threads used for detection
-        fragmentCameraBinding.bottomSheetLayout.threadsPlus.setOnClickListener {
-            if (objectDetectorHelper.numThreads < 4) {
-                objectDetectorHelper.numThreads++
-                updateControlsUi()
-            }
-        }
-
-        // When clicked, change the underlying hardware used for inference. Current options are CPU
-        // GPU, and NNAPI
-        fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.setSelection(0, false)
-        fragmentCameraBinding.bottomSheetLayout.spinnerDelegate.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                    objectDetectorHelper.currentDelegate = p2
-                    updateControlsUi()
-                }
-
-                override fun onNothingSelected(p0: AdapterView<*>?) {
-                    /* no op */
-                }
-            }
-
-        // When clicked, change the underlying model used for object detection
-        fragmentCameraBinding.bottomSheetLayout.spinnerModel.setSelection(0, false)
-        fragmentCameraBinding.bottomSheetLayout.spinnerModel.onItemSelectedListener =
-            object : AdapterView.OnItemSelectedListener {
-                override fun onItemSelected(p0: AdapterView<*>?, p1: View?, p2: Int, p3: Long) {
-                    objectDetectorHelper.currentModel = p2
-                    updateControlsUi()
-                }
-
-                override fun onNothingSelected(p0: AdapterView<*>?) {
-                    /* no op */
-                }
-            }
-    }
-
-    // Update the values displayed in the bottom sheet. Reset detector.
-    private fun updateControlsUi() {
-        fragmentCameraBinding.bottomSheetLayout.maxResultsValue.text =
-            objectDetectorHelper.maxResults.toString()
-        fragmentCameraBinding.bottomSheetLayout.thresholdValue.text =
-            String.format("%.2f", objectDetectorHelper.threshold)
-        fragmentCameraBinding.bottomSheetLayout.threadsValue.text =
-            objectDetectorHelper.numThreads.toString()
-
-        // Needs to be cleared instead of reinitialized because the GPU
-        // delegate needs to be initialized on the thread using it when applicable
-        objectDetectorHelper.clearObjectDetector()
-        fragmentCameraBinding.overlay.clear()
     }
 
     // Initialize CameraX, and prepare to bind the camera use cases
@@ -321,6 +223,7 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                 // The analyzer can then be assigned to the instance
                 .also {
                     it.setAnalyzer(cameraExecutor) { image ->
+                        isStoragePermissionGranted()
                         if (!::bitmapBuffer.isInitialized) {
                             // The image rotation and RGB image buffer are initialized only once
                             // the analyzer has started running
@@ -331,7 +234,12 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                             )
                         }
 
-                        detectObjects(image)
+                        //workaround for occasional FileNotFoundException exception
+                        try {
+                            detectObjects(image)
+                        }catch (ignored : Exception){
+
+                        }
                     }
                 }
 
@@ -373,9 +281,6 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
       imageWidth: Int
     ) {
         activity?.runOnUiThread {
-            fragmentCameraBinding.bottomSheetLayout.inferenceTimeVal.text =
-                            String.format("%d ms", inferenceTime)
-
             // Pass necessary information to OverlayView for drawing on the canvas
             fragmentCameraBinding.overlay.setResults(
                 results ?: LinkedList<Detection>(),
@@ -397,4 +302,27 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         }
     }
 
+    private fun isStoragePermissionGranted(): Boolean {
+        return true
+        /*return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                === PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.v(TAG, "Permission is granted")
+                true
+            } else {
+                Log.v(TAG, "Permission is revoked")
+                ActivityCompat.requestPermissions(
+                    requireActivity(),
+                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                    1
+                )
+                notifyUserAboutPermission()
+                false
+            }
+        } else { //permission is automatically granted on sdk<23 upon installation
+            Log.v(TAG, "Permission is granted")
+            true
+        }*/
+    }
 }
