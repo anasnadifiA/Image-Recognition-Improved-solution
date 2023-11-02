@@ -173,9 +173,6 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                 overlay.background = null
             }
         }
-
-        isStoragePermissionGranted()
-
     }
 
     // Initialize CameraX, and prepare to bind the camera use cases
@@ -223,7 +220,6 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
                 // The analyzer can then be assigned to the instance
                 .also {
                     it.setAnalyzer(cameraExecutor) { image ->
-                        isStoragePermissionGranted()
                         if (!::bitmapBuffer.isInitialized) {
                             // The image rotation and RGB image buffer are initialized only once
                             // the analyzer has started running
@@ -302,27 +298,4 @@ class CameraFragment : Fragment(), ObjectDetectorHelper.DetectorListener {
         }
     }
 
-    private fun isStoragePermissionGranted(): Boolean {
-        return true
-        /*return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                === PackageManager.PERMISSION_GRANTED
-            ) {
-                Log.v(TAG, "Permission is granted")
-                true
-            } else {
-                Log.v(TAG, "Permission is revoked")
-                ActivityCompat.requestPermissions(
-                    requireActivity(),
-                    arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
-                    1
-                )
-                notifyUserAboutPermission()
-                false
-            }
-        } else { //permission is automatically granted on sdk<23 upon installation
-            Log.v(TAG, "Permission is granted")
-            true
-        }*/
-    }
 }

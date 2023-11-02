@@ -1,20 +1,10 @@
 package com.upfeat.test
 
-import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Matrix
-import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.os.Handler
-import android.os.HandlerThread
-import android.provider.Settings
-import android.util.Log
-import android.view.PixelCopy
-import android.view.SurfaceView
 import android.view.View
-import androidx.annotation.RequiresApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,7 +83,7 @@ fun getScreenShot(screenView: View): Bitmap {
 //rotating bitmap, since 4:3 ratio is used by default in the example
 fun Bitmap.rotate(degrees: Float): Bitmap {
     val matrix = Matrix().apply {
-        //postRotate(degrees)
+        postRotate(degrees)
     }
     return Bitmap.createBitmap(this, 0, 0, width, height, matrix, true)
 }
